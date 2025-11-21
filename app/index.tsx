@@ -17,7 +17,7 @@ export default function HomeScreen() {
   const [selected, setSelected] = useState<string>(SERVICES[0]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -71,13 +71,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 14,
-    paddingTop: 6,
+    paddingTop: 0, // no top gap
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   logoText: {
     fontSize: 24,
@@ -98,10 +98,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   chipScroll: {
-    maxHeight: 44,
+    maxHeight: 36,
   },
   chipRow: {
-    paddingVertical: 4,
+    paddingVertical: 2,
     paddingRight: 6,
   },
   chip: {
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   },
   contentArea: {
     flex: 1,
-    marginTop: 10,
+    marginTop: 6,
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 16,
@@ -147,3 +147,4 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
 });
+
