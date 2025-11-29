@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
+import { useRouter } from 'expo-router';
 
 const SERVICES = [
   'Amazon',
@@ -13,8 +15,22 @@ const SERVICES = [
   'Craigslist',
 ];
 
+const SERVICE_URLS: Record<string, string | undefined> = {
+  Amazon: 'https://www.amazon.com/',
+  OfferUp: 'https://offerup.com/',
+  Walmart: 'https://www.walmart.com/',
+  'Uber Eats': 'https://www.ubereats.com/',
+  DoorDash: 'https://www.doordash.com/',
+  TaskRabbit: 'https://www.taskrabbit.com/',
+  Thumbtack: 'https://www.thumbtack.com/',
+  Craigslist: 'https://www.craigslist.org/',
+};
+
 export default function HomeScreen() {
   const [selected, setSelected] = useState<string>(SERVICES[0]);
+  const router = useRouter();
+
+  const currentUrl = useMemo(() => SERVICE_URLS[selected], [selected]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -22,10 +38,7 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.logoText}>Atlist</Text>
-          <Pressable
-            style={styles.avatar}
-            onPress={() => console.log('Profile button pressed')}
-          >
+          <Pressable style={styles.avatar} onPress={() => router.push('/profile')}>
             <Text style={styles.avatarText}>AT</Text>
           </Pressable>
         </View>
@@ -53,10 +66,16 @@ export default function HomeScreen() {
           })}
         </ScrollView>
 
-        {/* Full-height area below chips (swap with WebView later) */}
+        {/* Full-height area below chips */}
         <View style={styles.contentArea}>
-          <Text style={styles.contentTitle}>Selected site will appear here</Text>
-          <Text style={styles.contentSubtitle}>{selected}</Text>
+          {currentUrl ? (
+            <WebView style={styles.webview} source={{ uri: currentUrl }} />
+          ) : (
+            <View style={styles.fallback}>
+              <Text style={styles.contentTitle}>No URL available</Text>
+              <Text style={styles.contentSubtitle}>{selected}</Text>
+            </View>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -127,14 +146,21 @@ const styles = StyleSheet.create({
     marginTop: 6,
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    padding: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+  },
+  webview: {
+    flex: 1,
+  },
+  fallback: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
   contentTitle: {
     fontSize: 16,
