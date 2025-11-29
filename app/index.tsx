@@ -1,19 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
-
-const SERVICES = [
-  'Amazon',
-  'OfferUp',
-  'Walmart',
-  'Uber Eats',
-  'DoorDash',
-  'TaskRabbit',
-  'Thumbtack',
-  'Craigslist',
-];
+import { useWebsites } from './websites-context';
 
 const SERVICE_URLS: Record<string, string | undefined> = {
   Amazon: 'https://www.amazon.com/',
@@ -27,10 +17,17 @@ const SERVICE_URLS: Record<string, string | undefined> = {
 };
 
 export default function HomeScreen() {
-  const [selected, setSelected] = useState<string>(SERVICES[0]);
+  const { activated } = useWebsites();
+  const [selected, setSelected] = useState<string>(activated[0]?.name);
   const router = useRouter();
 
-  const currentUrl = useMemo(() => SERVICE_URLS[selected], [selected]);
+  useEffect(() => {
+    if (!selected || !activated.find((s) => s.name === selected)) {
+      setSelected(activated[0]?.name);
+    }
+  }, [activated, selected]);
+
+  const currentUrl = useMemo(() => (selected ? SERVICE_URLS[selected] : undefined), [selected]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -50,16 +47,26 @@ export default function HomeScreen() {
           style={styles.chipScroll}
           contentContainerStyle={styles.chipRow}
         >
-          {SERVICES.map((service) => {
-            const isSelected = service === selected;
+          {activated.map((service) => {
+            const isSelected = service.name === selected;
+            const chipColor = service.color;
             return (
               <Pressable
-                key={service}
-                style={[styles.chip, isSelected && styles.chipSelected]}
-                onPress={() => setSelected(service)}
+                key={service.name}
+                style={[
+                  styles.chip,
+                  chipColor && { backgroundColor: chipColor },
+                  isSelected && !chipColor && styles.chipSelected,
+                ]}
+                onPress={() => setSelected(service.name)}
               >
-                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                  {service}
+                <Text
+                  style={[
+                    styles.chipText,
+                    (isSelected || chipColor) && styles.chipTextSelected,
+                  ]}
+                >
+                  {service.name}
                 </Text>
               </Pressable>
             );
@@ -73,7 +80,7 @@ export default function HomeScreen() {
           ) : (
             <View style={styles.fallback}>
               <Text style={styles.contentTitle}>No URL available</Text>
-              <Text style={styles.contentSubtitle}>{selected}</Text>
+              <Text style={styles.contentSubtitle}>{selected ?? 'No site selected'}</Text>
             </View>
           )}
         </View>
