@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -11,6 +11,7 @@ import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useWebsites, type Site } from './websites-context';
+import { useProfile } from './profile-context';
 
 type SiteCategory = {
   title: string;
@@ -107,12 +108,42 @@ const SITE_CATEGORIES: SiteCategory[] = [
 ];
 
 export default function ProfileScreen() {
-  const { activated, activate, deactivate, reorder, setColor } = useWebsites();
+  const { activated, reorder } = useWebsites();
+  const { profile } = useProfile();
   const [modalVisible, setModalVisible] = useState(false);
   const [colorPickerFor, setColorPickerFor] = useState<string | null>(null);
+  const [draftSites, setDraftSites] = useState<Site[]>(activated);
   const router = useRouter();
 
-  const activeNames = useMemo(() => new Set(activated.map((s) => s.name)), [activated]);
+  const activeNames = useMemo(() => new Set(draftSites.map((s) => s.name)), [draftSites]);
+
+  // Sync draft with current activated when modal opens
+  useEffect(() => {
+    if (modalVisible) {
+      setDraftSites(activated);
+      setColorPickerFor(null);
+    }
+  }, [modalVisible, activated]);
+
+  const addSite = (name: string) => {
+    setDraftSites((prev) => {
+      if (prev.find((s) => s.name === name)) return prev;
+      return [...prev, { name }];
+    });
+  };
+
+  const removeSite = (name: string) => {
+    setDraftSites((prev) => prev.filter((s) => s.name !== name));
+  };
+
+  const setDraftColor = (name: string, color?: string) => {
+    setDraftSites((prev) => prev.map((s) => (s.name === name ? { ...s, color } : s)));
+  };
+
+  const applyDraft = () => {
+    reorder(draftSites);
+    setModalVisible(false);
+  };
 
   const renderSite = ({ item, drag, isActive }: RenderItemParams<Site>) => {
     const swatchColor = item.color ?? '#e5e7eb';
@@ -136,12 +167,13 @@ export default function ProfileScreen() {
   const profileCard = (
     <View style={styles.profileCard}>
       <View style={styles.profileHeader}>
-        <View style={styles.profileAvatar}>
-          <Text style={styles.profileAvatarText}>AT</Text>
+        <View style={[styles.profileAvatar, profile.avatarColor ? { backgroundColor: profile.avatarColor } : null]}>
+          <Text style={styles.profileAvatarText}>{profile.avatarText ?? 'AT'}</Text>
         </View>
         <View style={styles.profileText}>
-          <Text style={styles.username}>@atlist_user</Text>
-          <Text style={styles.name}>Alex Taylor</Text>
+          <Text style={styles.username}>{profile.username}</Text>
+          <Text style={styles.name}>{profile.name}</Text>
+          <Text style={styles.email}>{profile.email}</Text>
         </View>
         <Pressable style={styles.pencilButton} onPress={() => router.push('/edit-profile')}>
           <Text style={styles.pencilText}>✏️</Text>
@@ -208,7 +240,7 @@ export default function ProfileScreen() {
                 {cat.items.map((site) => {
                   const active = activeNames.has(site);
                   const isOpen = colorPickerFor === site;
-                  const siteColor = activated.find((s) => s.name === site)?.color;
+                  const siteColor = draftSites.find((s) => s.name === site)?.color;
                   const previewColor = siteColor ?? '#e5e7eb';
                   return (
                     <View key={site} style={styles.categoryRow}>
@@ -227,9 +259,9 @@ export default function ProfileScreen() {
                           style={[styles.toggleBox, active ? styles.minusBox : styles.plusBox]}
                           onPress={() => {
                             if (active) {
-                              deactivate(site);
+                              removeSite(site);
                             } else {
-                              activate(site);
+                              addSite(site);
                             }
                           }}
                         >
@@ -251,7 +283,7 @@ export default function ProfileScreen() {
                           key={c}
                           style={[styles.colorDot, { backgroundColor: c }]}
                           onPress={() => {
-                            setColor(site, c);
+                            setDraftColor(site, c);
                             setColorPickerFor(null);
                           }}
                         />
@@ -259,7 +291,7 @@ export default function ProfileScreen() {
                       <Pressable
                         style={[styles.colorDot, styles.clearDot]}
                         onPress={() => {
-                          setColor(site, undefined);
+                          setDraftColor(site, undefined);
                           setColorPickerFor(null);
                         }}
                       >
@@ -271,6 +303,11 @@ export default function ProfileScreen() {
               </View>
             ))}
           </ScrollView>
+          <View style={styles.modalFooter}>
+            <Pressable style={styles.saveButton} onPress={applyDraft}>
+              <Text style={styles.saveText}>Save</Text>
+            </Pressable>
+          </View>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -326,6 +363,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#0f172a',
+  },
+  email: {
+    fontSize: 13,
+    color: '#6b7280',
   },
   pencilButton: {
     paddingHorizontal: 10,
@@ -446,6 +487,22 @@ const styles = StyleSheet.create({
   modalContent: {
     padding: 16,
     gap: 12,
+  },
+  modalFooter: {
+    padding: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e5e7eb',
+  },
+  saveButton: {
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  saveText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
   },
   categoryBlock: {
     backgroundColor: '#fff',

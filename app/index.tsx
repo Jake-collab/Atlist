@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
+import { WebView } from 'react-native-webview';
 import { useWebsites } from './websites-context';
 
 const SERVICE_URLS: Record<string, string | undefined> = {
@@ -18,9 +18,11 @@ const SERVICE_URLS: Record<string, string | undefined> = {
 
 export default function HomeScreen() {
   const { activated } = useWebsites();
-  const [selected, setSelected] = useState<string>(activated[0]?.name);
   const router = useRouter();
+  const [selected, setSelected] = useState<string | undefined>(activated[0]?.name);
+  const [mounted, setMounted] = useState<string[]>(activated.map((s) => s.name));
 
+  // keep selection valid if list changes
   useEffect(() => {
     if (!selected || !activated.find((s) => s.name === selected)) {
       setSelected(activated[0]?.name);
@@ -28,6 +30,15 @@ export default function HomeScreen() {
   }, [activated, selected]);
 
   const currentUrl = useMemo(() => (selected ? SERVICE_URLS[selected] : undefined), [selected]);
+
+  const handleChipPress = useCallback((name: string) => {
+    setSelected(name);
+  }, []);
+
+  // Keep all currently activated sites mounted to avoid reload lag
+  useEffect(() => {
+    setMounted(activated.map((s) => s.name));
+  }, [activated]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -40,7 +51,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Compact bubbles pinned near the top */}
+        {/* Chips */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -48,7 +59,7 @@ export default function HomeScreen() {
           contentContainerStyle={styles.chipRow}
         >
           {activated.map((service) => {
-            const isSelected = service.name === selected;
+            const isActive = service.name === selected;
             const chipColor = service.color;
             return (
               <Pressable
@@ -56,14 +67,14 @@ export default function HomeScreen() {
                 style={[
                   styles.chip,
                   chipColor && { backgroundColor: chipColor },
-                  isSelected && !chipColor && styles.chipSelected,
+                  isActive && !chipColor && styles.chipSelected,
                 ]}
-                onPress={() => setSelected(service.name)}
+                onPress={() => handleChipPress(service.name)}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    (isSelected || chipColor) && styles.chipTextSelected,
+                    (isActive || chipColor) && styles.chipTextSelected,
                   ]}
                 >
                   {service.name}
@@ -73,16 +84,48 @@ export default function HomeScreen() {
           })}
         </ScrollView>
 
-        {/* Full-height area below chips */}
+        {/* Content */}
         <View style={styles.contentArea}>
-          {currentUrl ? (
-            <WebView style={styles.webview} source={{ uri: currentUrl }} />
-          ) : (
+          {mounted.map((name) => {
+            const uri = SERVICE_URLS[name];
+            if (!uri) return null;
+            const isActive = name === selected;
+            return (
+              <View
+                key={name}
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  isActive ? styles.webVisible : styles.webHidden,
+                ]}
+                pointerEvents={isActive ? 'auto' : 'none'}
+              >
+                <WebView
+                  source={{ uri }}
+                  cacheEnabled
+                  cacheMode="LOAD_CACHE_ELSE_NETWORK"
+                  domStorageEnabled
+                  sharedCookiesEnabled
+                  thirdPartyCookiesEnabled
+                  allowsInlineMediaPlayback
+                  setSupportMultipleWindows={false}
+                  allowsFullscreenVideo
+                  originWhitelist={['*']}
+                  overScrollMode="never"
+                  javaScriptEnabled
+                  renderToHardwareTextureAndroid
+                  androidLayerType="hardware"
+                  startInLoadingState={false}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            );
+          })}
+          {!currentUrl ? (
             <View style={styles.fallback}>
               <Text style={styles.contentTitle}>No URL available</Text>
               <Text style={styles.contentSubtitle}>{selected ?? 'No site selected'}</Text>
             </View>
-          )}
+          ) : null}
         </View>
       </View>
     </SafeAreaView>
@@ -90,94 +133,23 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingTop: 0, // no top gap
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#111827',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  chipScroll: {
-    maxHeight: 36,
-  },
-  chipRow: {
-    paddingVertical: 2,
-    paddingRight: 6,
-  },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 18,
-    backgroundColor: '#e5e7eb',
-    marginRight: 8,
-  },
-  chipSelected: {
-    backgroundColor: '#111827',
-  },
-  chipText: {
-    color: '#111827',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  chipTextSelected: {
-    color: '#ffffff',
-  },
-  contentArea: {
-    flex: 1,
-    marginTop: 6,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  webview: {
-    flex: 1,
-  },
-  fallback: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  contentTitle: {
-    fontSize: 16,
-    color: '#4b5563',
-    marginBottom: 8,
-  },
-  contentSubtitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
+  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, paddingHorizontal: 14, paddingTop: 0 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  logoText: { fontSize: 24, fontWeight: '700', color: '#0f172a' },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#ffffff', fontWeight: '700', fontSize: 14 },
+  chipScroll: { maxHeight: 36 },
+  chipRow: { paddingVertical: 2, paddingRight: 6 },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 18, backgroundColor: '#e5e7eb', marginRight: 8 },
+  chipSelected: { backgroundColor: '#111827' },
+  chipText: { color: '#111827', fontSize: 13, fontWeight: '600' },
+  chipTextSelected: { color: '#ffffff' },
+  contentArea: { flex: 1, marginTop: 6, backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden', position: 'relative' },
+  contentAreaNoShadow: { shadowColor: 'transparent', elevation: 0 },
+  webVisible: { opacity: 1 },
+  webHidden: { opacity: 0 },
+  fallback: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 },
+  contentTitle: { fontSize: 16, color: '#4b5563', marginBottom: 8 },
+  contentSubtitle: { fontSize: 22, fontWeight: '700', color: '#0f172a' },
 });
-

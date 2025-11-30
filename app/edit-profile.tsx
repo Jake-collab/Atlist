@@ -1,22 +1,34 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useProfile } from './profile-context';
 
 export default function EditProfileScreen() {
-  const [name, setName] = useState('Alex Taylor');
-  const [username, setUsername] = useState('@atlist_user');
-  const [email, setEmail] = useState('alex@example.com');
+  const { profile, updateProfile } = useProfile();
+  const [name, setName] = useState(profile.name);
+  const [username, setUsername] = useState(profile.username);
+  const [email, setEmail] = useState(profile.email);
   const [password, setPassword] = useState('••••••••');
   const [confirm, setConfirm] = useState('••••••••');
+  const [error, setError] = useState<string | null>(null);
 
   const isDirty = useMemo(() => {
     return (
-      name !== 'Alex Taylor' ||
-      username !== '@atlist_user' ||
-      email !== 'alex@example.com' ||
+      name !== profile.name ||
+      username !== profile.username ||
+      email !== profile.email ||
       password !== '••••••••' ||
       confirm !== '••••••••'
     );
-  }, [name, username, email, password, confirm]);
+  }, [name, username, email, password, confirm, profile]);
+
+  const onSave = () => {
+    if (password !== confirm) {
+      setError('Passwords do not match');
+      return;
+    }
+    setError(null);
+    updateProfile({ name, username, email });
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -48,8 +60,9 @@ export default function EditProfileScreen() {
           <Text style={styles.label}>Confirm Password</Text>
           <TextInput style={styles.input} value={confirm} onChangeText={setConfirm} secureTextEntry />
         </View>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {isDirty ? (
-          <Pressable style={styles.saveButton}>
+          <Pressable style={styles.saveButton} onPress={onSave}>
             <Text style={styles.saveText}>Save</Text>
           </Pressable>
         ) : null}
@@ -99,5 +112,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 15,
+  },
+  errorText: {
+    color: '#dc2626',
+    marginTop: 4,
   },
 });
