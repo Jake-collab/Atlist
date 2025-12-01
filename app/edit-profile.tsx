@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useProfile } from './profile-context';
 
 export default function EditProfileScreen() {
+  const router = useRouter();
   const { profile, updateProfile } = useProfile();
   const [name, setName] = useState(profile.name);
   const [username, setUsername] = useState(profile.username);
@@ -32,8 +34,14 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.headerBar}>
+        <Pressable onPress={() => router.back()} hitSlop={20}>
+          <Text style={styles.backText}>Back</Text>
+        </Pressable>
         <Text style={styles.title}>Edit Profile</Text>
+        <View style={{ width: 48 }} />
+      </View>
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.field}>
           <Text style={styles.label}>Name</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} />
@@ -75,6 +83,18 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  headerBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+  },
+  backText: {
+    color: '#2563eb',
+    fontWeight: '700',
   },
   content: {
     padding: 16,

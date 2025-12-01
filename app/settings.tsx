@@ -1,8 +1,10 @@
 import React from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSettings } from './settings-context';
 import { useWebsites } from './websites-context';
 import { useProfile } from './profile-context';
+import { useAuth } from './auth-context';
 
 const themes: { label: string; value: 'light' | 'dark' | 'system' }[] = [
   { label: 'Light Mode', value: 'light' },
@@ -16,9 +18,11 @@ const preloadOptions: { label: string; value: 'on' | 'off' }[] = [
 ];
 
 export default function SettingsScreen() {
-  const { settings, setTheme, setNotifications, setPreload, clearCachedSessions } = useSettings();
+  const router = useRouter();
+  const { settings, setTheme, setNotifications, setPreload, clearCachedSessions, setTwoFactor } = useSettings();
   const { reset: resetWebsites } = useWebsites();
   const { reset: resetProfile } = useProfile();
+  const { signOut } = useAuth();
 
   const sections = [
     {
@@ -59,34 +63,55 @@ export default function SettingsScreen() {
     },
     {
       title: 'Security',
-      items: [{ label: 'Two-Factor Authentication (2FA)', right: '›', onPress: () => {} }],
+      items: [
+        {
+          label: 'Two-Factor Authentication (2FA)',
+          right: settings.twoFactor ? 'On' : 'Off',
+          onPress: () => setTwoFactor(!settings.twoFactor),
+        },
+      ],
     },
     {
       title: 'Support',
       items: [
-        { label: 'Contact Support', right: '›', onPress: () => {} },
-        { label: 'Report a Bug', right: '›', onPress: () => {} },
-        { label: 'Request a Feature', right: '›', onPress: () => {} },
+        { label: 'Contact Support', right: '›', onPress: () => Linking.openURL('mailto:support@atlist.app?subject=Support') },
+        { label: 'Report a Bug', right: '›', onPress: () => Linking.openURL('mailto:support@atlist.app?subject=Bug Report') },
+        { label: 'Request a Feature', right: '›', onPress: () => Linking.openURL('mailto:support@atlist.app?subject=Feature Request') },
       ],
     },
     {
       title: 'Legal',
       items: [
-        { label: 'Privacy Policy', right: '›', onPress: () => {} },
-        { label: 'Terms of Service', right: '›', onPress: () => {} },
+        { label: 'Privacy Policy', right: '›', onPress: () => Linking.openURL('https://atlist.app/privacy') },
+        { label: 'Terms of Service', right: '›', onPress: () => Linking.openURL('https://atlist.app/terms') },
       ],
     },
     {
       title: 'Account',
       items: [
-        { label: 'Logout', right: '', onPress: () => {} },
-        { label: 'Delete Account', right: '', onPress: () => {} },
+        { label: 'Logout', right: '', onPress: () => signOut() },
+        {
+          label: 'Delete Account',
+          right: '',
+          onPress: () =>
+            Alert.alert('Delete Account', 'This will be handled by support.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'OK', onPress: () => {} }, // TODO: wire to backend/edge function
+            ]),
+        },
       ],
     },
   ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.headerBar}>
+        <Pressable onPress={() => router.back()}>
+          <Text style={styles.backText}>Back</Text>
+        </Pressable>
+        <Text style={styles.headerTitle}>Settings</Text>
+        <View style={{ width: 48 }} />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
         {sections.map((sec) => (
           <View key={sec.title} style={styles.card}>
@@ -125,6 +150,23 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  headerBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+  },
+  backText: {
+    color: '#2563eb',
+    fontWeight: '700',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   content: {
     padding: 16,

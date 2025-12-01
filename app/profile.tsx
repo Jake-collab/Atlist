@@ -117,7 +117,6 @@ export default function ProfileScreen() {
 
   const activeNames = useMemo(() => new Set(draftSites.map((s) => s.name)), [draftSites]);
 
-  // Sync draft with current activated when modal opens
   useEffect(() => {
     if (modalVisible) {
       setDraftSites(activated);
@@ -179,10 +178,6 @@ export default function ProfileScreen() {
           <Text style={styles.pencilText}>✏️</Text>
         </Pressable>
       </View>
-      <Pressable style={styles.gearRow} onPress={() => router.push('/settings')}>
-        <Text style={styles.gearText}>⚙️ Settings</Text>
-        <Text style={styles.gearChevron}>›</Text>
-      </Pressable>
     </View>
   );
 
@@ -202,7 +197,16 @@ export default function ProfileScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+      <View style={styles.headerBar}>
+        <Pressable onPress={() => router.back()} hitSlop={40} style={styles.headerButton}>
+          <Text style={styles.backText}>Back</Text>
+        </Pressable>
+        <Text style={styles.screenTitle}>Profile</Text>
+        <Pressable onPress={() => router.push('/settings')} hitSlop={40} style={styles.headerButton}>
+          <Text style={styles.backText}>Settings</Text>
+        </Pressable>
+      </View>
       <DraggableFlatList
         data={activated}
         keyExtractor={(item) => item.name}
@@ -319,6 +323,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
+  headerBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    zIndex: 2,
+  },
+  headerButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  backText: {
+    color: '#2563eb',
+    fontWeight: '700',
+  },
+  screenTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
   listContainer: {
     padding: 16,
     gap: 10,
@@ -376,22 +402,6 @@ const styles = StyleSheet.create({
   },
   pencilText: {
     fontSize: 16,
-  },
-  gearRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingVertical: 8,
-  },
-  gearText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  gearChevron: {
-    fontSize: 16,
-    color: '#9ca3af',
   },
   listHeaderCard: {
     backgroundColor: '#fff',
@@ -522,7 +532,7 @@ const styles = StyleSheet.create({
   },
   categoryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space_between',
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,

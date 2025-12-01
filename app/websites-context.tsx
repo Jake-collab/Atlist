@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { View, Text } from 'react-native';
 import { loadState, saveState, clearState } from '../storage/persistedState';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './auth-context';
 
 type Site = {
   name: string;
@@ -22,6 +24,7 @@ type WebsitesContextValue = {
   setColor: (name: string, color?: string) => void;
   reset: () => void;
   loading: boolean;
+  syncing: boolean;
 };
 
 const DEFAULT_ACTIVATED: Site[] = [
@@ -45,10 +48,13 @@ export const WebsitesProvider = ({ children }: { children: React.ReactNode }) =>
     selected: DEFAULT_ACTIVATED[0]?.name,
   });
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const { user } = useAuth();
+  const storageKey = user ? `${STORAGE_KEY}_${user.id}` : STORAGE_KEY;
 
   useEffect(() => {
     const hydrate = async () => {
-      const stored = await loadState<WebsitesState>(STORAGE_KEY);
+      const stored = await loadState<WebsitesState>(storageKey);
       if (stored && stored.activated?.length) {
         setState({
           activated: stored.activated,
@@ -63,12 +69,75 @@ export const WebsitesProvider = ({ children }: { children: React.ReactNode }) =>
       setLoading(false);
     };
     hydrate();
-  }, []);
+  }, [storageKey]);
+
+  // reset on logout
+  useEffect(() => {
+    if (!user && !loading) {
+      setState({ activated: DEFAULT_ACTIVATED, selected: DEFAULT_ACTIVATED[0]?.name });
+      clearState(storageKey);
+    }
+  }, [user, loading, storageKey]);
+
+  // Pull from Supabase on auth
+  useEffect(() => {
+    const fetchRemote = async () => {
+      if (!user) return;
+      setSyncing(true);
+      const { data, error } = await supabase
+        .from('user_websites')
+        .select('website_id, position, custom_color')
+        .eq('user_id', user.id)
+        .order('position', { ascending: true });
+      if (!error && data) {
+        const nextSites = data.map((row) => ({
+          name: row.website_id,
+          color: row.custom_color ?? undefined,
+        }));
+        if (nextSites.length) {
+          setState({
+            activated: nextSites,
+            selected: nextSites[0]?.name,
+          });
+        } else {
+          setState({
+            activated: DEFAULT_ACTIVATED,
+            selected: DEFAULT_ACTIVATED[0]?.name,
+          });
+        }
+      }
+      setSyncing(false);
+    };
+    fetchRemote();
+  }, [user]);
+
+  const pushRemote = useCallback(
+    async (next: WebsitesState) => {
+      if (!user) return;
+      setSyncing(true);
+      try {
+        const rows = next.activated.map((s, idx) => ({
+          user_id: user.id,
+          website_id: s.name,
+          position: idx,
+          custom_color: s.color ?? null,
+        }));
+        await supabase.from('user_websites').delete().eq('user_id', user.id);
+        if (rows.length) {
+          await supabase.from('user_websites').upsert(rows);
+        }
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [user],
+  );
 
   useEffect(() => {
     if (loading) return;
-    saveState(STORAGE_KEY, state);
-  }, [state, loading]);
+    saveState(storageKey, state);
+    pushRemote(state);
+  }, [state, loading, pushRemote, storageKey]);
 
   const setSelected = (name: string | undefined) => {
     setState((prev) => ({
@@ -120,7 +189,10 @@ export const WebsitesProvider = ({ children }: { children: React.ReactNode }) =>
   const reset = () => {
     const next = { activated: DEFAULT_ACTIVATED, selected: DEFAULT_ACTIVATED[0]?.name };
     setState(next);
-    clearState(STORAGE_KEY);
+    clearState(storageKey);
+    if (user) {
+      supabase.from('user_websites').delete().eq('user_id', user.id);
+    }
   };
 
   const value = useMemo(
@@ -134,8 +206,9 @@ export const WebsitesProvider = ({ children }: { children: React.ReactNode }) =>
       setColor,
       reset,
       loading,
+      syncing,
     }),
-    [state, loading],
+    [state, loading, syncing],
   );
 
   if (loading) {
@@ -156,3 +229,4 @@ export const useWebsites = () => {
 };
 
 export type { Site };
+
