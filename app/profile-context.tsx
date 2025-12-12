@@ -10,6 +10,7 @@ export type ProfileState = {
   email: string;
   avatarText?: string;
   avatarColor?: string;
+  role?: string;
 };
 
 type ProfileContextValue = {
@@ -26,6 +27,7 @@ const DEFAULT_PROFILE: ProfileState = {
   email: 'alex@example.com',
   avatarText: 'AT',
   avatarColor: '#111827',
+  role: 'user',
 };
 
 const STORAGE_KEY = 'profile_state';
@@ -50,34 +52,42 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
         try {
           const { data, error } = await supabase
             .from('profiles')
-            .select('email, username, full_name, avatar_url')
+            .select('email, username, full_name, avatar_url, role')
             .eq('id', user.id)
             .single();
           if (!error && data) {
+            const nextEmail = data.email ?? user.email ?? DEFAULT_PROFILE.email;
+            const nextUsername = data.username ?? (user.email ? `@${user.email.split('@')[0]}` : DEFAULT_PROFILE.username);
+            const nextRole = data.role ?? 'user';
+            const nextName = data.full_name ?? DEFAULT_PROFILE.name;
+            const nextAvatar = data.avatar_url ?? DEFAULT_PROFILE.avatarColor;
             setProfile({
               ...DEFAULT_PROFILE,
-              email: data.email ?? DEFAULT_PROFILE.email,
-              username: data.username ?? DEFAULT_PROFILE.username,
-              name: data.full_name ?? DEFAULT_PROFILE.name,
+              email: nextEmail,
+              username: nextUsername,
+              name: nextName,
               avatarText: DEFAULT_PROFILE.avatarText,
-              avatarColor: DEFAULT_PROFILE.avatarColor,
+              avatarColor: nextAvatar,
+              role: nextRole,
             });
           } else if (error && (error.code === 'PGRST116' || error.code === 'PGRST103')) {
             const defaults = {
               id: user.id,
               email: user.email ?? DEFAULT_PROFILE.email,
               username: user.email ? `@${user.email.split('@')[0]}` : DEFAULT_PROFILE.username,
-              full_name: DEFAULT_PROFILE.name,
-              avatar_url: DEFAULT_PROFILE.avatarColor,
-            };
-            await supabase.from('profiles').insert(defaults);
-            setProfile({
-              ...DEFAULT_PROFILE,
-              email: defaults.email,
-              username: defaults.username,
-              name: defaults.full_name,
-            });
-          }
+            full_name: DEFAULT_PROFILE.name,
+            avatar_url: DEFAULT_PROFILE.avatarColor,
+            role: 'user',
+          };
+          await supabase.from('profiles').insert(defaults);
+          setProfile({
+            ...DEFAULT_PROFILE,
+            email: defaults.email,
+            username: defaults.username,
+            name: defaults.full_name,
+            role: defaults.role,
+          });
+        }
         } catch (e) {
           // ignore bootstrap errors
         } finally {
@@ -105,10 +115,11 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
         try {
           await supabase.from('profiles').upsert({
             id: user.id,
-            email: profile.email,
-            username: profile.username,
+            email: profile.email || user.email || DEFAULT_PROFILE.email,
+            username: profile.username || (user.email ? `@${user.email.split('@')[0]}` : DEFAULT_PROFILE.username),
             full_name: profile.name,
             avatar_url: profile.avatarColor,
+            role: profile.role ?? 'user',
           });
         } finally {
           setSyncing(false);

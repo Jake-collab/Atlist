@@ -44,18 +44,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signIn: AuthContextValue['signIn'] = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      return { error: error?.message };
+    } catch (e: any) {
+      return { error: e?.message ?? 'Sign-in failed' };
+    }
   };
 
   const signUp: AuthContextValue['signUp'] = async (email, password) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error: error?.message };
+    try {
+      const { error } = await supabase.auth.signUp({ email, password });
+      return { error: error?.message };
+    } catch (e: any) {
+      return { error: e?.message ?? 'Sign-up failed' };
+    }
   };
 
   const signOut: AuthContextValue['signOut'] = async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error: error?.message };
+    try {
+      const { error } = await supabase.auth.signOut();
+      return { error: error?.message };
+    } catch (e: any) {
+      return { error: e?.message ?? 'Sign-out failed' };
+    }
   };
 
   const value = useMemo(

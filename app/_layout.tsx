@@ -7,6 +7,7 @@ import { WebsitesProvider } from './websites-context';
 import { SettingsProvider } from './settings-context';
 import { ProfileProvider } from './profile-context';
 import { AuthProvider, useAuth } from './auth-context';
+import { CatalogProvider } from './catalog-context';
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -40,18 +41,20 @@ export default function RootLayout() {
       <AuthProvider>
         <SettingsProvider>
           <ProfileProvider>
-            <WebsitesProvider>
-              <AuthGate>
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="profile" />
-                  <Stack.Screen name="settings" />
-                  <Stack.Screen name="edit-profile" />
-                  <Stack.Screen name="auth/index" />
-                  <Stack.Screen name="auth/forgot-password" />
-                </Stack>
-              </AuthGate>
-            </WebsitesProvider>
+            <CatalogProvider>
+              <WebsitesProvider>
+                <AuthGate>
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="profile" />
+                    <Stack.Screen name="settings" />
+                    <Stack.Screen name="edit-profile" />
+                    <Stack.Screen name="auth/index" />
+                    <Stack.Screen name="auth/forgot-password" />
+                  </Stack>
+                </AuthGate>
+              </WebsitesProvider>
+            </CatalogProvider>
           </ProfileProvider>
         </SettingsProvider>
       </AuthProvider>
