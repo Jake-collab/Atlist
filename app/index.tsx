@@ -5,16 +5,69 @@ import { useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { useWebsites } from './websites-context';
 import { useSettings } from './settings-context';
+import { useCatalog } from './catalog-context';
 
 const SERVICE_URLS: Record<string, string | undefined> = {
+  // Shopping & Retail
   Amazon: 'https://www.amazon.com/',
-  OfferUp: 'https://offerup.com/',
   Walmart: 'https://www.walmart.com/',
-  'Uber Eats': 'https://www.ubereats.com/',
+  Target: 'https://www.target.com/',
+  Costco: 'https://www.costco.com/',
+  "Sam's Club": 'https://www.samsclub.com/',
+  "BJ's": 'https://www.bjs.com/',
+  eBay: 'https://www.ebay.com/',
+  Wayfair: 'https://www.wayfair.com/',
+  Temu: 'https://www.temu.com/',
+  Shein: 'https://us.shein.com/',
+  Etsy: 'https://www.etsy.com/',
+  Groupon: 'https://www.groupon.com/',
+  // Marketplace
+  OfferUp: 'https://offerup.com/',
+  Craigslist: 'https://www.craigslist.org/',
+  // Food & Grocery
   DoorDash: 'https://www.doordash.com/',
+  'Uber Eats': 'https://www.ubereats.com/',
+  Grubhub: 'https://www.grubhub.com/',
+  Postmates: 'https://postmates.com/',
+  Instacart: 'https://www.instacart.com/',
+  Shipt: 'https://www.shipt.com/',
+  // Local Services & Gig
   TaskRabbit: 'https://www.taskrabbit.com/',
   Thumbtack: 'https://www.thumbtack.com/',
-  Craigslist: 'https://www.craigslist.org/',
+  "Angie's List": 'https://www.angi.com/',
+  Wag: 'https://wagwalking.com/',
+  Rover: 'https://www.rover.com/',
+  Instawork: 'https://www.instawork.com/',
+  // Housing
+  Zillow: 'https://www.zillow.com/',
+  Redfin: 'https://www.redfin.com/',
+  Realtor: 'https://www.realtor.com/',
+  HotPads: 'https://hotpads.com/',
+  'Apartments.com': 'https://www.apartments.com/',
+  // Travel
+  Airbnb: 'https://www.airbnb.com/',
+  Vrbo: 'https://www.vrbo.com/',
+  'Booking.com': 'https://www.booking.com/',
+  'Hotels.com': 'https://www.hotels.com/',
+  Kayak: 'https://www.kayak.com/',
+  // Social / Media
+  Facebook: 'https://www.facebook.com/',
+  X: 'https://x.com/',
+  Threads: 'https://www.threads.net/',
+  Tumblr: 'https://www.tumblr.com/',
+  LinkedIn: 'https://www.linkedin.com/',
+  Reddit: 'https://www.reddit.com/',
+  YouTube: 'https://www.youtube.com/',
+  Twitch: 'https://www.twitch.tv/',
+  // Jobs
+  Indeed: 'https://www.indeed.com/',
+  ZipRecruiter: 'https://www.ziprecruiter.com/',
+  Glassdoor: 'https://www.glassdoor.com/',
+  Snagajob: 'https://www.snagajob.com/',
+  Monster: 'https://www.monster.com/',
+  // Freelance
+  Fiverr: 'https://www.fiverr.com/',
+  Upwork: 'https://www.upwork.com/',
 };
 
 export default function HomeScreen() {
@@ -22,15 +75,22 @@ export default function HomeScreen() {
   const router = useRouter();
   const { settings } = useSettings();
   const [cache, setCache] = useState<string[]>(() => (selected ? [selected] : []));
+  const [fullScreen, setFullScreen] = useState(false);
+  const { byId } = useCatalog();
+  const isDark = settings.theme === 'dark';
 
   // keep selection valid if list changes
   useEffect(() => {
+    if (!activated.length) return;
     if (!selected || !activated.find((s) => s.name === selected)) {
       setSelected(activated[0]?.name);
     }
   }, [activated, selected, setSelected]);
 
-  const currentUrl = useMemo(() => (selected ? SERVICE_URLS[selected] : undefined), [selected]);
+  const currentUrl = useMemo(() => {
+    if (!selected) return undefined;
+    return byId[selected]?.url ?? SERVICE_URLS[selected];
+  }, [selected, byId]);
 
   const handleChipPress = useCallback((name: string) => {
     setSelected(name);
@@ -55,50 +115,62 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.logoText}>Atlist</Text>
-          <Pressable style={styles.avatar} onPress={() => router.push('/profile')}>
-            <Text style={styles.avatarText}>AT</Text>
-          </Pressable>
-        </View>
+        {!fullScreen && (
+          <>
+            <View style={styles.header}>
+              <Text style={[styles.logoText, isDark && styles.darkText]}>Atlist</Text>
+              <View style={styles.headerActions}>
+                <Pressable style={[styles.widenButton, isDark && styles.widenButtonDark]} onPress={() => setFullScreen(true)}>
+                  <Text style={[styles.widenText, isDark && styles.darkButtonText]}>⇱</Text>
+                </Pressable>
+                <Pressable style={[styles.avatar, isDark && styles.avatarDark]} onPress={() => router.push('/profile')}>
+                  <Text style={[styles.avatarText, isDark && styles.avatarTextDark]}>AT</Text>
+                </Pressable>
+              </View>
+            </View>
 
-        {/* Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chipScroll}
-          contentContainerStyle={styles.chipRow}
-        >
-          {activated.map((service) => {
-            const isActive = service.name === selected;
-            const chipColor = service.color;
-            return (
-              <Pressable
-                key={service.name}
-                style={[
-                  styles.chip,
-                  chipColor && { backgroundColor: chipColor },
-                  isActive && !chipColor && styles.chipSelected,
-                ]}
-                onPress={() => handleChipPress(service.name)}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    (isActive || chipColor) && styles.chipTextSelected,
-                  ]}
-                >
-                  {service.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+            {/* Chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.chipScroll}
+              contentContainerStyle={styles.chipRow}
+            >
+              {activated.map((service) => {
+                const isActive = service.name === selected;
+                const chipColor = service.color;
+                const bubbleIsDark = isDark && !chipColor;
+                return (
+                  <Pressable
+                    key={service.name}
+                    style={[
+                      styles.chip,
+                      chipColor && { backgroundColor: chipColor },
+                      bubbleIsDark && styles.chipDark,
+                      isActive && !chipColor && !isDark && styles.chipSelected,
+                      isActive && bubbleIsDark && styles.chipSelectedDark,
+                    ]}
+                    onPress={() => handleChipPress(service.name)}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        (isActive || chipColor || isDark) && styles.chipTextSelected,
+                      ]}
+                    >
+                      {service.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </>
+        )}
 
         {/* Content */}
-        <View style={styles.contentArea}>
+        <View style={[styles.contentArea, fullScreen && styles.contentAreaFull]}>
           {cache.map((name) => {
-            const uri = SERVICE_URLS[name];
+            const uri = byId[name]?.url ?? SERVICE_URLS[name];
             if (!uri) return null;
             const isActive = name === selected;
             return (
@@ -138,6 +210,11 @@ export default function HomeScreen() {
               <Text style={styles.contentSubtitle}>{selected ?? 'No site selected'}</Text>
             </View>
           ) : null}
+          {fullScreen && (
+            <Pressable style={styles.minimizeButton} onPress={() => setFullScreen(false)}>
+              <Text style={styles.minimizeText}>⇲</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -149,18 +226,38 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 14, paddingTop: 8 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, zIndex: 2 },
   logoText: { fontSize: 24, fontWeight: '700', color: '#0f172a' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  widenButton: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' },
+  widenButtonDark: { backgroundColor: '#111827', borderWidth: 1, borderColor: '#fff' },
+  widenText: { color: '#111827', fontWeight: '800', fontSize: 16 },
+  darkButtonText: { color: '#fff' },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' },
+  avatarDark: { backgroundColor: '#fff' },
   avatarText: { color: '#ffffff', fontWeight: '700', fontSize: 14 },
+  avatarTextDark: { color: '#111827' },
   chipScroll: { maxHeight: 36 },
   chipRow: { paddingVertical: 2, paddingRight: 6 },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 18, backgroundColor: '#e5e7eb', marginRight: 8 },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 18, backgroundColor: '#e5e7eb', marginRight: 8, borderWidth: 1, borderColor: '#000' },
   chipSelected: { backgroundColor: '#111827' },
+  chipDark: { backgroundColor: '#000', borderColor: '#fff' },
+  chipSelectedDark: { backgroundColor: '#000', borderColor: '#fff' },
   chipText: { color: '#111827', fontSize: 13, fontWeight: '600' },
   chipTextSelected: { color: '#ffffff' },
   contentArea: { flex: 1, marginTop: 6, backgroundColor: '#ffffff', borderRadius: 16, overflow: 'hidden' },
+  contentAreaFull: { marginTop: 0, borderRadius: 0 },
   webVisible: { opacity: 1 },
   webHidden: { opacity: 0 },
   fallback: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 },
   contentTitle: { fontSize: 16, color: '#4b5563', marginBottom: 8 },
   contentSubtitle: { fontSize: 22, fontWeight: '700', color: '#0f172a' },
+  minimizeButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  minimizeText: { color: '#fff', fontWeight: '800' },
 });

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../../lib/supabase";
 import styles from "../../../page.module.css";
 
-type Profile = { id: string; email: string | null; username: string | null; role: string | null; full_name?: string | null };
+type Profile = { id: string; email: string | null; username: string | null; role: string | null; membership_active?: boolean | null; full_name?: string | null };
 type Settings = { theme: string | null; notifications_enabled: boolean | null; preload_enabled: boolean | null; two_factor_enabled: boolean | null };
 type UserWebsite = { website_id: string; position: number | null; custom_color: string | null; website_catalog?: { name: string | null; url: string | null } };
 
@@ -32,7 +32,7 @@ export default function UserDetailPage() {
       }
       try {
         const [{ data: pData, error: pErr }, { data: sData, error: sErr }, { data: wData, error: wErr }] = await Promise.all([
-          supabase.from("profiles").select("id, email, username, role, full_name").eq("id", userId).single(),
+          supabase.from("profiles").select("id, email, username, role, membership_active, full_name").eq("id", userId).single(),
           supabase.from("user_settings").select("theme, notifications_enabled, preload_enabled, two_factor_enabled").eq("user_id", userId).single(),
           supabase
             .from("user_websites")
@@ -69,6 +69,17 @@ export default function UserDetailPage() {
     }
   };
 
+  const toggleMembership = async () => {
+    if (!userId || !profile) return;
+    setBusy(true);
+    setError(null);
+    const next = !(profile.membership_active ?? false);
+    const { error } = await supabase.from("profiles").update({ membership_active: next }).eq("id", userId);
+    if (error) setError(error.message);
+    else setProfile({ ...profile, membership_active: next });
+    setBusy(false);
+  };
+
   if (loading) return <main className={styles.main}><p>Loading user…</p></main>;
   if (error) return <main className={styles.main}><p className={styles.error}>{error}</p></main>;
   if (!profile) return <main className={styles.main}><p>User not found.</p></main>;
@@ -83,6 +94,12 @@ export default function UserDetailPage() {
           <p><strong>Username:</strong> {profile.username ?? "—"}</p>
           <p><strong>Name:</strong> {profile.full_name ?? "—"}</p>
           <p><strong>Role:</strong> {profile.role ?? "user"}</p>
+          <p><strong>Membership:</strong> {profile.membership_active ? "Active" : "None"}</p>
+          <div className={styles.actionGroup} style={{ marginTop: 12 }}>
+            <button className={styles.linkButton} onClick={toggleMembership} disabled={busy}>
+              {busy ? "Updating…" : profile.membership_active ? "Disable membership" : "Enable membership"}
+            </button>
+          </div>
         </div>
 
         <div className={styles.card}>

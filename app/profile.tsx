@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
@@ -12,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useWebsites, type Site } from './websites-context';
 import { useProfile } from './profile-context';
+import { useAuth } from './auth-context';
 
 type SiteCategory = {
   title: string;
@@ -90,8 +94,8 @@ const SITE_CATEGORIES: SiteCategory[] = [
     items: ['Booking.com', 'Hotels.com', 'Kayak'],
   },
   {
-    title: 'Social Media & Communities — Social Platforms',
-    items: ['Facebook', 'X (Twitter)', 'Threads', 'Tumblr', 'LinkedIn', 'Reddit'],
+    title: 'Social Media & Communities – Social Platforms',
+    items: ['Facebook', 'X', 'Threads', 'Tumblr', 'LinkedIn', 'Reddit'],
   },
   {
     title: 'Social Media & Communities — Video Platforms',
@@ -107,15 +111,30 @@ const SITE_CATEGORIES: SiteCategory[] = [
   },
 ];
 
+const FREE_DEFAULT_SITES = new Set([
+  'Amazon',
+  'OfferUp',
+  'Uber Eats',
+  'Thumbtack',
+  'Airbnb',
+  'X',
+  'Indeed',
+]);
+
 export default function ProfileScreen() {
   const { activated, reorder } = useWebsites();
   const { profile } = useProfile();
+  const { user } = useAuth();
   const [modalVisible, setModalVisible] = useState(false);
   const [colorPickerFor, setColorPickerFor] = useState<string | null>(null);
   const [draftSites, setDraftSites] = useState<Site[]>(activated);
   const router = useRouter();
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const activeNames = useMemo(() => new Set(draftSites.map((s) => s.name)), [draftSites]);
+  const hasMembership = profile.membershipActive === true;
 
   useEffect(() => {
     if (modalVisible) {
@@ -142,6 +161,36 @@ export default function ProfileScreen() {
   const applyDraft = () => {
     reorder(draftSites);
     setModalVisible(false);
+  };
+
+  const handleCheckout = async () => {
+    const FUNCTION_URL = 'https://YOUR-SUPABASE-PROJECT.functions.supabase.co/create-checkout-session'; // TODO: replace with your deployed Edge function URL
+    const email = profile.email || user?.email;
+    if (!email) {
+      Alert.alert('Missing email', 'Please set an email on your profile before subscribing.');
+      return;
+    }
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          promoCode: promoCode || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.url) {
+        Alert.alert('Checkout error', json?.error ?? 'Unable to start checkout');
+        return;
+      }
+      await Linking.openURL(json.url);
+    } catch (e: any) {
+      Alert.alert('Checkout error', e?.message ?? 'Unable to start checkout');
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   const renderSite = ({ item, drag, isActive }: RenderItemParams<Site>) => {
@@ -246,22 +295,33 @@ export default function ProfileScreen() {
                   const isOpen = colorPickerFor === site;
                   const siteColor = draftSites.find((s) => s.name === site)?.color;
                   const previewColor = siteColor ?? '#e5e7eb';
+                  const isLocked = !hasMembership && !FREE_DEFAULT_SITES.has(site);
                   return (
                     <View key={site} style={styles.categoryRow}>
                       <View style={styles.categoryLeft}>
                         <View style={[styles.colorPreview, { backgroundColor: previewColor }]} />
-                        <Text style={styles.categorySite}>{site}</Text>
+                        <Text style={[styles.categorySite, isLocked && styles.lockedText]}>{site}</Text>
                       </View>
                       <View style={styles.categoryActions}>
                         <Pressable
                           style={styles.pencilButtonSmall}
-                          onPress={() => setColorPickerFor(isOpen ? null : site)}
+                          onPress={() => {
+                            if (isLocked) {
+                              setShowPaywall(true);
+                              return;
+                            }
+                            setColorPickerFor(isOpen ? null : site);
+                          }}
                         >
-                          <Text style={styles.pencilText}>✏️</Text>
+                          <Text style={styles.pencilText}>Edit</Text>
                         </Pressable>
                         <Pressable
                           style={[styles.toggleBox, active ? styles.minusBox : styles.plusBox]}
                           onPress={() => {
+                            if (isLocked) {
+                              setShowPaywall(true);
+                              return;
+                            }
                             if (active) {
                               removeSite(site);
                             } else {
@@ -270,7 +330,7 @@ export default function ProfileScreen() {
                           }}
                         >
                           <Text style={active ? styles.toggleMinus : styles.togglePlus}>
-                            {active ? '–' : '+'}
+                            {isLocked ? '🔒' : active ? '–' : '+'}
                           </Text>
                         </Pressable>
                       </View>
@@ -313,6 +373,43 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
         </SafeAreaView>
+      </Modal>
+
+      <Modal visible={showPaywall} transparent animationType="fade" onRequestClose={() => setShowPaywall(false)}>
+        <View style={styles.paywallOverlay}>
+          <View style={styles.paywallCard}>
+            <Text style={styles.paywallTitle}>Atlist Membership</Text>
+            <Text style={styles.paywallBody}>Unlock all websites for $3.99/month.</Text>
+            <Text style={styles.paywallBodySmall}>
+              Stripe checkout launches in your browser. On success, membership will activate after the webhook updates your account.
+            </Text>
+            <View style={styles.formRow}>
+              <Text style={styles.paywallLabel}>Promo code</Text>
+              <View style={styles.promoRow}>
+                <TextInput
+                  style={styles.promoInput}
+                  placeholder="Optional"
+                  placeholderTextColor="#94a3b8"
+                  value={promoCode}
+                  onChangeText={setPromoCode}
+                  autoCapitalize="none"
+                />
+                <Pressable
+                  style={[styles.paywallButton, styles.promoButton]}
+                  onPress={handleCheckout}
+                  disabled={checkoutLoading}
+                >
+                  <Text style={styles.paywallButtonText}>{checkoutLoading ? 'Loading…' : 'Subscribe $3.99'}</Text>
+                </Pressable>
+              </View>
+            </View>
+            <View style={styles.paywallActions}>
+              <Pressable style={styles.paywallButton} onPress={() => setShowPaywall(false)}>
+                <Text style={styles.paywallButtonText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -543,6 +640,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#111827',
   },
+  lockedText: {
+    color: '#6b7280',
+  },
   categoryLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -614,5 +714,74 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#111827',
+  },
+  paywallOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  paywallCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    gap: 10,
+  },
+  paywallTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  paywallBody: {
+    fontSize: 14,
+    color: '#334155',
+  },
+  paywallBodySmall: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  paywallActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  paywallButton: {
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  paywallButtonText: {
+    color: '#fff',
+    fontWeight: '800',
+  },
+  formRow: {
+    gap: 6,
+    marginTop: 8,
+  },
+  paywallLabel: {
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '700',
+  },
+  promoRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  promoInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: '#0f172a',
+  },
+  promoButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
 });

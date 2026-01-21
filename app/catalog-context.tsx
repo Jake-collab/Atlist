@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { View, Text } from 'react-native';
 import { supabase } from '../lib/supabase';
 
 export type CatalogEntry = {
@@ -43,14 +42,6 @@ export const CatalogProvider = ({ children }: { children: React.ReactNode }) => 
     });
     return map;
   }, [catalog]);
-
-  if (loading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Text>Loading...</Text>
-      </View>
-    );
-  }
 
   return <CatalogContext.Provider value={{ catalog, byId, loading }}>{children}</CatalogContext.Provider>;
 };

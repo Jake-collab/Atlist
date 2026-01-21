@@ -15,6 +15,7 @@ export default function HomePage() {
   const [authing, setAuthing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const envMissing = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   const fetchProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -23,23 +24,43 @@ export default function HomePage() {
       setLoading(false);
       return;
     }
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, email, username, role")
-      .eq("id", session.user.id)
-      .single();
-    if (error) {
-      setError(error.message);
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, email, username, role")
+        .eq("id", session.user.id)
+        .limit(1);
+      if (error) throw error;
+      if (data && data.length) {
+        const row = data[0];
+        setProfile({
+          id: row.id,
+          email: row.email ?? session.user.email ?? null,
+          username: row.username ?? null,
+          role: row.role ?? "user",
+        });
+      } else {
+        const fallbackEmail = session.user.email ?? "user@example.com";
+        const fallbackUsername = fallbackEmail ? `@${fallbackEmail.split("@")[0]}` : "@user";
+        await supabase.from("profiles").insert({
+          id: session.user.id,
+          email: fallbackEmail,
+          username: fallbackUsername,
+          role: "admin",
+        });
+        setProfile({
+          id: session.user.id,
+          email: fallbackEmail,
+          username: fallbackUsername,
+          role: "admin",
+        });
+      }
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to load profile");
       setProfile(null);
-    } else {
-      setProfile({
-        id: data.id,
-        email: data.email ?? null,
-        username: data.username ?? null,
-        role: data.role ?? "user",
-      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -69,6 +90,9 @@ export default function HomePage() {
     <main className={styles.main}>
       <div className={styles.centerColumn}>
         <h1>Atlist Admin</h1>
+        {envMissing && (
+          <p className={styles.error}>Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local</p>
+        )}
         {loading ? (
           <p>Loading session…</p>
         ) : profile ? (
@@ -78,6 +102,10 @@ export default function HomePage() {
             {!isAdmin && <p style={{ color: "crimson" }}>You are not an admin.</p>}
             {isAdmin && (
               <div className={styles.cardGrid}>
+                <Link className={styles.card} href="/admin">
+                  <h3>Dashboard →</h3>
+                  <p>Health, counts, catalog validation.</p>
+                </Link>
                 <Link className={styles.card} href="/admin/users">
                   <h3>Users →</h3>
                   <p>Inspect profiles and their data.</p>
@@ -85,6 +113,30 @@ export default function HomePage() {
                 <Link className={styles.card} href="/admin/websites">
                   <h3>Website Catalog →</h3>
                   <p>Manage master list of sites.</p>
+                </Link>
+                <Link className={styles.card} href="/admin/announcements">
+                  <h3>Announcements →</h3>
+                  <p>Post banners/updates to users.</p>
+                </Link>
+                <Link className={styles.card} href="/admin/promos">
+                  <h3>Promos →</h3>
+                  <p>Manage promo codes/discounts (stub).</p>
+                </Link>
+                <Link className={styles.card} href="/admin/revenue">
+                  <h3>Revenue →</h3>
+                  <p>Track membership revenue (stub).</p>
+                </Link>
+                <Link className={styles.card} href="/admin/diagnostics">
+                  <h3>Diagnostics →</h3>
+                  <p>Ping + RLS checks.</p>
+                </Link>
+                <Link className={styles.card} href="/admin/support">
+                  <h3>Support Inbox →</h3>
+                  <p>View support tickets.</p>
+                </Link>
+                <Link className={styles.card} href="/admin/bugs">
+                  <h3>Bug Inbox →</h3>
+                  <p>View bug reports.</p>
                 </Link>
               </div>
             )}

@@ -1,10 +1,11 @@
-import React from 'react';
-import { Alert, Linking, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Linking, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSettings } from './settings-context';
 import { useWebsites } from './websites-context';
 import { useProfile } from './profile-context';
 import { useAuth } from './auth-context';
+import { supabase } from '../lib/supabase';
 
 const themes: { label: string; value: 'light' | 'dark' | 'system' }[] = [
   { label: 'Light Mode', value: 'light' },
@@ -23,6 +24,7 @@ export default function SettingsScreen() {
   const { reset: resetWebsites } = useWebsites();
   const { reset: resetProfile } = useProfile();
   const { signOut } = useAuth();
+  const [ticketModal, setTicketModal] = useState<{ open: boolean; type: 'support' | 'bug'; message: string }>({ open: false, type: 'support', message: '' });
 
   const sections = [
     {
@@ -67,36 +69,64 @@ export default function SettingsScreen() {
         {
           label: 'Two-Factor Authentication (2FA)',
           right: settings.twoFactor ? 'On' : 'Off',
-          onPress: () => setTwoFactor(!settings.twoFactor),
+          onPress: () => setTwoFactor(!settings.twoFactor), // TODO: wire email OTP
         },
       ],
     },
     {
       title: 'Support',
       items: [
-        { label: 'Contact Support', right: '›', onPress: () => Linking.openURL('mailto:support@atlist.app?subject=Support') },
-        { label: 'Report a Bug', right: '›', onPress: () => Linking.openURL('mailto:support@atlist.app?subject=Bug Report') },
-        { label: 'Request a Feature', right: '›', onPress: () => Linking.openURL('mailto:support@atlist.app?subject=Feature Request') },
+        { label: 'Contact Support', right: '✉️', onPress: () => setTicketModal({ open: true, type: 'support', message: '' }) },
+        { label: 'Report a Bug', right: '✉️', onPress: () => setTicketModal({ open: true, type: 'bug', message: '' }) },
+        { label: 'Request a Feature', right: '✉️', onPress: () => Linking.openURL('mailto:support@atlist.app?subject=Feature Request') },
       ],
     },
     {
       title: 'Legal',
       items: [
-        { label: 'Privacy Policy', right: '›', onPress: () => Linking.openURL('https://atlist.app/privacy') },
-        { label: 'Terms of Service', right: '›', onPress: () => Linking.openURL('https://atlist.app/terms') },
+        { label: 'Privacy Policy', right: '📄', onPress: () => router.push('/legal/privacy') },
+        { label: 'Terms of Service', right: '📄', onPress: () => router.push('/legal/terms') },
       ],
     },
     {
       title: 'Account',
       items: [
-        { label: 'Logout', right: '', onPress: () => signOut() },
+        {
+          label: 'Logout',
+          right: '',
+          onPress: () =>
+            Alert.alert('Logout', 'Are you sure you want to logout?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Logout', style: 'destructive', onPress: () => signOut() },
+            ]),
+        },
         {
           label: 'Delete Account',
           right: '',
           onPress: () =>
-            Alert.alert('Delete Account', 'This will be handled by support.', [
+            Alert.alert('Delete Account', 'This will delete your data and sign you out.', [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'OK', onPress: () => {} }, // TODO: wire to backend/edge function
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    const { data: userData } = await supabase.auth.getUser();
+                    const uid = userData?.user?.id;
+                    if (uid) {
+                      await supabase.from('user_websites').delete().eq('user_id', uid);
+                      await supabase.from('user_settings').delete().eq('user_id', uid);
+                      await supabase.from('support_tickets').delete().eq('user_id', uid);
+                      await supabase.from('profiles').delete().eq('id', uid);
+                      // TODO: secure function to delete auth user from Supabase Auth
+                    }
+                  } catch {
+                    // ignore
+                  } finally {
+                    signOut();
+                  }
+                },
+              },
             ]),
         },
       ],
@@ -142,6 +172,43 @@ export default function SettingsScreen() {
           </View>
         ))}
       </ScrollView>
+
+      <Modal visible={ticketModal.open} transparent animationType="fade" onRequestClose={() => setTicketModal({ ...ticketModal, open: false })}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{ticketModal.type === 'support' ? 'Contact Support' : 'Report a Bug'}</Text>
+            <TextInput
+              style={styles.modalInput}
+              multiline
+              placeholder="Type your message"
+              placeholderTextColor="#94a3b8"
+              value={ticketModal.message}
+              onChangeText={(t) => setTicketModal((prev) => ({ ...prev, message: t }))}
+            />
+            <View style={styles.modalActions}>
+              <Pressable style={styles.modalButtonSecondary} onPress={() => setTicketModal({ ...ticketModal, open: false })}>
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={styles.modalButton}
+                onPress={async () => {
+                  if (!ticketModal.message.trim()) return;
+                  const { data: userData } = await supabase.auth.getUser();
+                  await supabase.from('support_tickets').insert({
+                    user_id: userData?.user?.id,
+                    email: userData?.user?.email,
+                    type: ticketModal.type,
+                    message: ticketModal.message.trim(),
+                  });
+                  setTicketModal({ open: false, type: 'support', message: '' });
+                }}
+              >
+                <Text style={styles.modalButtonText}>Send</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -181,46 +248,53 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
-    gap: 6,
+    gap: 10,
   },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#0f172a',
   },
+  note: {
+    color: '#4b5563',
+    fontSize: 13,
+  },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e7eb',
-  },
-  rowSpace: {
     alignItems: 'center',
-  },
-  item: {
-    fontSize: 14,
-    color: '#111827',
-  },
-  status: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  note: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 4,
+    justifyContent: 'space-between',
+    paddingVertical: 10,
   },
   activeRow: {
     backgroundColor: '#f1f5f9',
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 8,
   },
-  dangerRow: {
-    marginTop: 6,
+  item: {
+    fontSize: 15,
+    color: '#0f172a',
+    fontWeight: '600',
   },
-  dangerText: {
-    color: '#dc2626',
+  status: {
+    fontSize: 13,
+    color: '#475569',
     fontWeight: '700',
   },
+  dangerRow: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e5e7eb',
+  },
+  dangerText: {
+    color: '#b91c1c',
+    fontWeight: '700',
+  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  modalCard: { width: '100%', maxWidth: 380, backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 12 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
+  modalInput: { minHeight: 100, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 10, textAlignVertical: 'top', color: '#0f172a' },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  modalButton: { backgroundColor: '#0f172a', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
+  modalButtonText: { color: '#fff', fontWeight: '800' },
+  modalButtonSecondary: { backgroundColor: '#e5e7eb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
+  modalButtonSecondaryText: { color: '#111827', fontWeight: '700' },
 });

@@ -132,6 +132,14 @@
   align-items: center;
 }
 
+.listHeaderUsers, .listRowUsers {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.8fr 0.9fr 0.8fr 1fr;
+  gap: 12px;
+  padding: 12px 14px;
+  align-items: center;
+}
+
 .listHeader {
   background: #f3f4f6;
   font-weight: 700;
