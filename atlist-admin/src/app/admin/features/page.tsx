@@ -7,7 +7,7 @@ import styles from "../../page.module.css";
 
 type Ticket = { id: string; category: string; subject: string | null; email: string | null; created_at: string; status: string | null };
 
-export default function BugsQueuePage() {
+export default function FeaturesQueuePage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +19,7 @@ export default function BugsQueuePage() {
       const { data, error } = await supabase
         .from("support_tickets")
         .select("id, category, subject, email, created_at, status")
-        .eq("category", "bug")
+        .eq("category", "feature")
         .order("created_at", { ascending: false });
       if (error) setError(error.message);
       else setTickets(data as Ticket[]);
@@ -28,13 +28,13 @@ export default function BugsQueuePage() {
     load();
   }, []);
 
-  if (loading) return <main className={styles.main}><p>Loading bug tickets…</p></main>;
+  if (loading) return <main className={styles.main}><p>Loading feature tickets…</p></main>;
   if (error) return <main className={styles.main}><p className={styles.error}>{error}</p></main>;
 
   return (
     <main className={styles.main}>
       <div className={styles.centerColumn}>
-        <h2>Bug Tickets</h2>
+        <h2>Feature Requests</h2>
         <div className={styles.listCard}>
           <div className={styles.listHeader}>
             <span>Subject</span>
@@ -43,7 +43,7 @@ export default function BugsQueuePage() {
             <span>Status</span>
           </div>
           {tickets.map((t) => (
-            <Link key={t.id} href={`/admin/bugs/${t.id}`} className={styles.listRow}>
+            <Link key={t.id} href={`/admin/features/${t.id}`} className={styles.listRow}>
               <span>{t.subject ?? "(no subject)"}</span>
               <span>{t.email ?? "—"}</span>
               <span>{new Date(t.created_at).toLocaleString()}</span>

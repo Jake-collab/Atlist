@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useProfile } from './profile-context';
+import { supabase } from '../lib/supabase';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -23,14 +24,24 @@ export default function EditProfileScreen() {
     );
   }, [name, username, email, password, confirm, profile]);
 
-  const onSave = () => {
+  const onSave = async () => {
     if (password !== confirm) {
       setError('Passwords do not match');
       return;
     }
+    // Duplicate checks
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, username')
+      .or(`email.eq.${email},username.eq.${username}`)
+      .limit(1);
+    if (!error && data && data.length > 0 && (email !== profile.email || username !== profile.username)) {
+      setError('Email or username already in use');
+      return;
+    }
     setError(null);
     updateProfile({ name, username, email });
-  };
+    };
 
   return (
     <SafeAreaView style={styles.safeArea}>

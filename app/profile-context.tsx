@@ -17,6 +17,7 @@ export type ProfileState = {
 type ProfileContextValue = {
   profile: ProfileState;
   updateProfile: (next: Partial<ProfileState>) => void;
+  refreshMembership: () => Promise<void>;
   reset: () => void;
   loading: boolean;
   syncing: boolean;
@@ -138,6 +139,14 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
     setProfile((prev) => ({ ...prev, ...next }));
   };
 
+  const refreshMembership = async () => {
+    if (!user) return;
+    const { data, error } = await supabase.from('profiles').select('membership_active').eq('id', user.id).single();
+    if (!error && data) {
+      setProfile((prev) => ({ ...prev, membershipActive: data.membership_active ?? false }));
+    }
+  };
+
   const reset = () => {
     setProfile(DEFAULT_PROFILE);
     clearState(storageKey);
@@ -150,6 +159,7 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
     () => ({
       profile,
       updateProfile,
+      refreshMembership,
       reset,
       loading,
       syncing,

@@ -13,7 +13,6 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '../auth-context';
 import { supabase } from '../../lib/supabase';
-import { decode } from 'base-64';
 
 type Mode = 'login' | 'signup';
 
@@ -102,7 +101,7 @@ export default function AuthScreen() {
   const loginWithGoogle = async () => {
     setError(null);
     try {
-      const redirectTo = 'exp://127.0.0.1:8081'; // TODO: set your deep link / scheme
+      const redirectTo = 'atlist://auth-callback'; // TODO: ensure this matches your configured scheme in Supabase/Google
       const { error: googleErr } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

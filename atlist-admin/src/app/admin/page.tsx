@@ -84,6 +84,9 @@ export default function AdminDashboard() {
               <Link href="/admin/users" className={styles.linkButton}>Users</Link>
               <Link href="/admin/websites" className={styles.linkButton}>Website Catalog</Link>
               <Link href="/admin/announcements" className={styles.linkButton}>Announcements</Link>
+              <Link href="/admin/support" className={styles.linkButton}>Support</Link>
+              <Link href="/admin/bugs" className={styles.linkButton}>Bugs</Link>
+              <Link href="/admin/features" className={styles.linkButton}>Features</Link>
             </div>
           </div>
           {loading && <p>Loading…</p>}

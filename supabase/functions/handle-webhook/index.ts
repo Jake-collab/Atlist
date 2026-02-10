@@ -4,6 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.18.0?target=deno&deno-std=0.177.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2?target=deno";
 
 const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY");
 const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
@@ -26,15 +27,12 @@ serve(async (req) => {
     return new Response(`Webhook Error: ${(err as Error).message}`, { status: 400 });
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseUrl = Deno.env.get("PROJECT_SUPABASE_URL") || Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY");
   if (!supabaseUrl || !supabaseServiceKey) {
     return new Response("Missing Supabase service credentials", { status: 500 });
   }
-  const supabaseClient = (await import("https://esm.sh/@supabase/supabase-js@2.42.8")).createClient(
-    supabaseUrl,
-    supabaseServiceKey
-  );
+  const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
     switch (event.type) {

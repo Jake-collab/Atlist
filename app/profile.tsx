@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -13,9 +12,11 @@ import {
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { WebView } from 'react-native-webview';
 import { useWebsites, type Site } from './websites-context';
 import { useProfile } from './profile-context';
 import { useAuth } from './auth-context';
+import { supabase } from '../lib/supabase';
 
 type SiteCategory = {
   title: string;
@@ -123,7 +124,7 @@ const FREE_DEFAULT_SITES = new Set([
 
 export default function ProfileScreen() {
   const { activated, reorder } = useWebsites();
-  const { profile } = useProfile();
+  const { profile, updateProfile, refreshMembership } = useProfile();
   const { user } = useAuth();
   const [modalVisible, setModalVisible] = useState(false);
   const [colorPickerFor, setColorPickerFor] = useState<string | null>(null);
@@ -132,6 +133,8 @@ export default function ProfileScreen() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [showCheckout, setShowCheckout] = useState(false);
 
   const activeNames = useMemo(() => new Set(draftSites.map((s) => s.name)), [draftSites]);
   const hasMembership = profile.membershipActive === true;
@@ -163,8 +166,37 @@ export default function ProfileScreen() {
     setModalVisible(false);
   };
 
+  const handleMembershipRefresh = async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('membership_active')
+        .eq('id', user.id)
+        .single();
+      if (!error && data) {
+        updateProfile({ membershipActive: data.membership_active ?? false });
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const onCheckoutNav = async (navState: any) => {
+    const url: string = navState.url || '';
+    if (url.startsWith('atlist://checkout-success')) {
+      setShowCheckout(false);
+      setCheckoutUrl(null);
+      await refreshMembership();
+    }
+    if (url.startsWith('atlist://checkout-cancel')) {
+      setShowCheckout(false);
+      setCheckoutUrl(null);
+    }
+  };
+
   const handleCheckout = async () => {
-    const FUNCTION_URL = 'https://YOUR-SUPABASE-PROJECT.functions.supabase.co/create-checkout-session'; // TODO: replace with your deployed Edge function URL
+    const FUNCTION_URL = 'https://wgecvckucgliumsaovwm.supabase.co/functions/v1/create-checkout-session'; // replace if your functions URL differs
     const email = profile.email || user?.email;
     if (!email) {
       Alert.alert('Missing email', 'Please set an email on your profile before subscribing.');
@@ -185,7 +217,8 @@ export default function ProfileScreen() {
         Alert.alert('Checkout error', json?.error ?? 'Unable to start checkout');
         return;
       }
-      await Linking.openURL(json.url);
+      setCheckoutUrl(json.url);
+      setShowCheckout(true);
     } catch (e: any) {
       Alert.alert('Checkout error', e?.message ?? 'Unable to start checkout');
     } finally {
@@ -410,6 +443,24 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      <Modal visible={showCheckout && !!checkoutUrl} animationType="slide" onRequestClose={() => { setShowCheckout(false); setCheckoutUrl(null); }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: 12 }}>
+            <Pressable onPress={() => { setShowCheckout(false); setCheckoutUrl(null); }} hitSlop={20}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>X</Text>
+            </Pressable>
+          </View>
+          {checkoutUrl ? (
+            <WebView
+              source={{ uri: checkoutUrl }}
+              onNavigationStateChange={onCheckoutNav}
+              startInLoadingState
+              style={{ flex: 1 }}
+            />
+          ) : null}
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );

@@ -1,8 +1,8 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.8";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2?target=deno";
 import Stripe from "https://esm.sh/stripe@14.18.0?target=deno&deno-std=0.177.0";
 
 const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY");
-const supabaseUrl = Deno.env.get("SUPABASE_URL");
+const supabaseUrl = Deno.env.get("PROJECT_SUPABASE_URL") || Deno.env.get("SUPABASE_URL");
 const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY");
 
 Deno.serve(async (req) => {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Linking, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSettings } from './settings-context';
 import { useWebsites } from './websites-context';
@@ -25,6 +25,7 @@ export default function SettingsScreen() {
   const { reset: resetProfile } = useProfile();
   const { signOut } = useAuth();
   const [ticketModal, setTicketModal] = useState<{ open: boolean; type: 'support' | 'bug'; message: string }>({ open: false, type: 'support', message: '' });
+  const [featureModal, setFeatureModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
 
   const sections = [
     {
@@ -76,9 +77,9 @@ export default function SettingsScreen() {
     {
       title: 'Support',
       items: [
-        { label: 'Contact Support', right: '✉️', onPress: () => setTicketModal({ open: true, type: 'support', message: '' }) },
-        { label: 'Report a Bug', right: '✉️', onPress: () => setTicketModal({ open: true, type: 'bug', message: '' }) },
-        { label: 'Request a Feature', right: '✉️', onPress: () => Linking.openURL('mailto:support@atlist.app?subject=Feature Request') },
+        { label: 'Contact Support', right: '→', onPress: () => setTicketModal({ open: true, type: 'support', message: '' }) },
+        { label: 'Report a Bug', right: '→', onPress: () => setTicketModal({ open: true, type: 'bug', message: '' }) },
+        { label: 'Request a Feature', right: '→', onPress: () => setFeatureModal({ open: true, message: '' }) },
       ],
     },
     {
@@ -193,14 +194,19 @@ export default function SettingsScreen() {
                 style={styles.modalButton}
                 onPress={async () => {
                   if (!ticketModal.message.trim()) return;
-                  const { data: userData } = await supabase.auth.getUser();
-                  await supabase.from('support_tickets').insert({
-                    user_id: userData?.user?.id,
-                    email: userData?.user?.email,
-                    type: ticketModal.type,
-                    message: ticketModal.message.trim(),
-                  });
-                  setTicketModal({ open: false, type: 'support', message: '' });
+                  try {
+                    await supabase.functions.invoke('create-ticket', {
+                      body: {
+                        category: ticketModal.type,
+                        subject: ticketModal.type === 'bug' ? 'Bug report' : 'Support',
+                        body: ticketModal.message.trim(),
+                      },
+                    });
+                    setTicketModal({ open: false, type: 'support', message: '' });
+                    Alert.alert('Sent', 'Your message was sent.');
+                  } catch (e: any) {
+                    Alert.alert('Error', e?.message ?? 'Could not send message');
+                  }
                 }}
               >
                 <Text style={styles.modalButtonText}>Send</Text>
@@ -298,3 +304,44 @@ const styles = StyleSheet.create({
   modalButtonSecondary: { backgroundColor: '#e5e7eb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   modalButtonSecondaryText: { color: '#111827', fontWeight: '700' },
 });
+      <Modal visible={featureModal.open} transparent animationType="fade" onRequestClose={() => setFeatureModal({ ...featureModal, open: false })}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Request a Feature</Text>
+            <TextInput
+              style={styles.modalInput}
+              multiline
+              placeholder="Type your request"
+              placeholderTextColor="#94a3b8"
+              value={featureModal.message}
+              onChangeText={(t) => setFeatureModal((prev) => ({ ...prev, message: t }))}
+            />
+            <View style={styles.modalActions}>
+              <Pressable style={styles.modalButtonSecondary} onPress={() => setFeatureModal({ ...featureModal, open: false })}>
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={styles.modalButton}
+                onPress={async () => {
+                  if (!featureModal.message.trim()) return;
+                  try {
+                    await supabase.functions.invoke('create-ticket', {
+                      body: {
+                        category: 'feature',
+                        subject: 'Feature request',
+                        body: featureModal.message.trim(),
+                      },
+                    });
+                    setFeatureModal({ open: false, message: '' });
+                    Alert.alert('Sent', 'Your request was sent.');
+                  } catch (e: any) {
+                    Alert.alert('Error', e?.message ?? 'Could not send request');
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonText}>Send</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
